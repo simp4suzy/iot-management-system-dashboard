@@ -1,0 +1,1067 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IoT Inventory Management System</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'iot-bg': '#080c14',
+            'iot-bg2': '#0d1320',
+            'iot-card': '#111827',
+            'iot-bdr': '#1e293b',
+            'iot-fg': '#e2e8f0',
+            'iot-fg2': '#cbd5e1',
+            'iot-mut': '#64748b',
+            'iot-acc': '#00d4aa',
+            'iot-warn': '#f59e0b',
+            'iot-dng': '#ef4444',
+            'iot-ok': '#22c55e'
+          },
+          fontFamily: {
+            display: ['Space Grotesk', 'sans-serif'],
+            body: ['DM Sans', 'sans-serif']
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    :root{--acc:#00d4aa;--warn:#f59e0b;--dng:#ef4444;--ok:#22c55e}
+    *{box-sizing:border-box}
+    body{font-family:'DM Sans',sans-serif;background:#080c14;color:#e2e8f0;min-height:100vh;overflow-x:hidden}
+    .bg-orb{position:fixed;border-radius:50%;filter:blur(100px);opacity:.18;pointer-events:none;z-index:0;animation:orbF 20s ease-in-out infinite}
+    .bg-orb-1{width:500px;height:500px;background:#00d4aa;top:-150px;left:-100px}
+    .bg-orb-2{width:400px;height:400px;background:#f59e0b;bottom:-100px;right:-80px;animation-delay:-7s;animation-duration:25s}
+    @keyframes orbF{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(30px,-20px) scale(1.05)}66%{transform:translate(-20px,15px) scale(.95)}}
+
+    .pulse-dot{width:8px;height:8px;border-radius:50%;background:var(--ok);position:relative;display:inline-block}
+    .pulse-dot::after{content:'';position:absolute;inset:-3px;border-radius:50%;border:2px solid var(--ok);animation:pls 2s ease-out infinite}
+    .pulse-dot.danger{background:var(--dng)}
+    .pulse-dot.danger::after{border-color:var(--dng)}
+    .pulse-dot.loading{background:var(--warn)}
+    .pulse-dot.loading::after{border-color:var(--warn)}
+    @keyframes pls{0%{transform:scale(1);opacity:.8}100%{transform:scale(2.2);opacity:0}}
+
+    .stat-card{position:relative;overflow:hidden;transition:transform .2s,box-shadow .3s}
+    .stat-card:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(0,0,0,.25)}
+    .stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--card-accent,var(--acc)),transparent)}
+
+    .alert-banner{border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:10px;animation:banP 3s ease-in-out infinite;border:1px solid rgba(239,68,68,.25);background:linear-gradient(90deg,rgba(239,68,68,.12),rgba(239,68,68,.04))}
+    @keyframes banP{0%,100%{border-color:rgba(239,68,68,.25)}50%{border-color:rgba(239,68,68,.5)}}
+
+    .toast-c{position:fixed;top:76px;right:16px;z-index:1000;display:flex;flex-direction:column;gap:8px}
+    .toast{padding:12px 16px;border-radius:8px;min-width:280px;max-width:380px;animation:tIn .4s ease;box-shadow:0 8px 30px rgba(0,0,0,.4);display:flex;align-items:center;gap:10px;font-size:.85rem}
+    .toast.out{animation:tOut .3s ease forwards}
+    .toast-warn{background:#1a2332;border:1px solid rgba(245,158,11,.35);color:#fbbf24}
+    .toast-danger{background:#1a1215;border:1px solid rgba(239,68,68,.35);color:#fca5a5}
+    .toast-success{background:#0d1f15;border:1px solid rgba(34,197,94,.35);color:#86efac}
+    @keyframes tIn{from{opacity:0;transform:translateX(50px)}to{opacity:1;transform:translateX(0)}}
+    @keyframes tOut{to{opacity:0;transform:translateX(50px)}}
+
+    .iot-input{background:#080c14;border:1px solid #1e293b;border-radius:6px;padding:7px 10px;color:#e2e8f0;font-family:'DM Sans',sans-serif;font-size:.8rem;width:100%;transition:border-color .2s;outline:none}
+    .iot-input:focus{border-color:#00d4aa;box-shadow:0 0 0 2px rgba(0,212,170,.08)}
+    .iot-input::placeholder{color:#475569}
+
+    .iot-btn{padding:6px 12px;border-radius:6px;font-weight:600;font-size:.75rem;cursor:pointer;transition:all .15s;border:none;font-family:'Space Grotesk',sans-serif;display:inline-flex;align-items:center;gap:6px}
+    .iot-btn:active{transform:scale(.97)}
+    .iot-btn-primary{background:#00d4aa;color:#080c14}
+    .iot-btn-primary:hover{background:#00eabb;box-shadow:0 4px 16px rgba(0,212,170,.25)}
+    .iot-btn-ghost{background:transparent;border:1px solid #334155;color:#cbd5e1}
+    .iot-btn-ghost:hover{background:#1a2332;border-color:#475569}
+    .iot-btn-danger{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.25);color:#fca5a5}
+    .iot-btn-danger:hover{background:rgba(239,68,68,.2)}
+    .iot-btn-warn{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.25);color:#fbbf24}
+    .iot-btn-warn:hover{background:rgba(245,158,11,.2)}
+
+    .alert-item{padding:10px 14px;border-left:3px solid var(--dng);background:rgba(239,68,68,.03);border-radius:0 6px 6px 0;animation:fUp .3s ease}
+    .num-flash{animation:nF .35s ease}
+    @keyframes nF{0%{opacity:.5;transform:scale(.96)}50%{opacity:1;transform:scale(1.02)}100%{opacity:1;transform:scale(1)}}
+    @keyframes fUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+    input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:#00d4aa;cursor:pointer;border:2px solid #080c14}
+    input[type="range"]{-webkit-appearance:none;appearance:none;height:4px;background:#1e293b;border-radius:2px;outline:none}
+    ::-webkit-scrollbar{width:5px}
+    ::-webkit-scrollbar-track{background:#0d1320}
+    ::-webkit-scrollbar-thumb{background:#334155;border-radius:3px}
+
+    .mode-btn{padding:6px 14px;border-radius:6px;font-size:.7rem;font-weight:600;cursor:pointer;transition:all .2s;border:1px solid transparent;font-family:'Space Grotesk',sans-serif}
+    .mode-btn.active-sim{background:rgba(0,212,170,.15);border-color:rgba(0,212,170,.3);color:#00d4aa}
+    .mode-btn.active-live{background:rgba(245,158,11,.15);border-color:rgba(245,158,11,.3);color:#f59e0b}
+    .mode-btn:not(.active-sim):not(.active-live){background:transparent;border-color:#334155;color:#64748b}
+    .mode-btn:not(.active-sim):not(.active-live):hover{border-color:#475569;color:#cbd5e1}
+    .field-badge{display:inline-flex;align-items:center;gap:3px;padding:2px 6px;border-radius:4px;font-size:.55rem;font-weight:600;font-family:'Space Grotesk',sans-serif}
+
+    .control-panel-hidden{display:none !important;}
+
+    @media(max-width:768px){
+      .stat-grid{grid-template-columns:repeat(2,1fr)!important}
+      .shelf-grid{grid-template-columns:1fr!important}
+      .sum-grid{grid-template-columns:repeat(2,1fr)!important}
+    }
+    @media(max-width:480px){
+      .stat-grid{grid-template-columns:1fr!important}
+      .sum-grid{grid-template-columns:1fr!important}
+    }
+    @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+  </style>
+</head>
+
+<body class="bg-iot-bg">
+  <div class="bg-orb bg-orb-1" aria-hidden="true"></div>
+  <div class="bg-orb bg-orb-2" aria-hidden="true"></div>
+  <div class="toast-c" id="toastC" aria-live="polite"></div>
+
+  <div class="relative z-10 min-h-screen flex flex-col">
+    <header class="border-b border-iot-bdr bg-iot-bg/80 backdrop-blur-xl sticky top-0 z-50">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-iot-acc to-iot-acc2 flex items-center justify-center">
+            <i class="fa-solid fa-boxes-stacked text-iot-bg text-xs"></i>
+          </div>
+          <div>
+            <h1 class="font-display font-bold text-sm sm:text-base text-iot-fg leading-tight">IoT Inventory System</h1>
+            <p class="text-[0.6rem] text-iot-mut hidden sm:block">3-Shelf ESP32 Load Cell + LCD I2C + ThingSpeak</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <div class="flex items-center gap-1.5 p-1 rounded-lg bg-iot-bg2 border border-iot-bdr">
+            <button class="mode-btn active-sim" id="btnSim" onclick="setMode('sim')">
+              <i class="fa-solid fa-flask mr-1" style="font-size:.55rem"></i>Simulate
+            </button>
+            <button class="mode-btn" id="btnLive" onclick="setMode('live')">
+              <i class="fa-solid fa-satellite-dish mr-1" style="font-size:.55rem"></i>Live
+            </button>
+          </div>
+          <div class="flex items-center gap-2 px-2.5 py-1 rounded-full bg-iot-acc/10 border border-iot-acc/20">
+            <span class="pulse-dot" id="mainDot"></span>
+            <span class="text-[0.65rem] font-display font-medium text-iot-acc" id="mainLabel">SIMULATING</span>
+          </div>
+          <span class="text-xs text-iot-mut font-mono hidden sm:block" id="clock">--:--:--</span>
+        </div>
+      </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-5">
+      <div class="flex flex-wrap items-center gap-2 mb-4 p-2.5 rounded-lg bg-iot-card/60 border border-iot-bdr">
+        <button class="iot-btn iot-btn-primary" id="ppBtn" onclick="toggleRun()">
+          <i class="fa-solid fa-pause" id="ppIcon"></i><span id="ppText">Pause</span>
+        </button>
+        <button class="iot-btn iot-btn-ghost" onclick="resetAll()">
+          <i class="fa-solid fa-rotate-right"></i>Reset
+        </button>
+        <div class="flex items-center gap-2 ml-auto">
+          <span class="text-[0.65rem] text-iot-mut">Speed:</span>
+          <input type="range" min="0.5" max="3" step="0.25" value="1" id="spdSlider" class="w-20" oninput="setSpd(this.value)">
+          <span class="text-[0.65rem] font-mono text-iot-fg2 w-6" id="spdLbl">1x</span>
+        </div>
+        <span class="text-[0.65rem] text-iot-mut hidden sm:block" id="intLbl">Interval: 2s</span>
+      </div>
+
+      <div class="hidden mb-4 p-3 rounded-lg bg-iot-card/60 border border-iot-warn/20" id="liveConfig">
+        <div class="flex items-center gap-2 mb-2">
+          <i class="fa-solid fa-circle-info text-iot-warn" style="font-size:.65rem"></i>
+          <span class="text-xs font-display font-medium text-iot-warn">Live Mode — Reading from ThingSpeak</span>
+        </div>
+        <div class="grid sm:grid-cols-3 gap-2">
+          <div>
+            <label class="text-[0.6rem] text-iot-mut block mb-1">Channel 0 ID</label>
+            <input type="text" class="iot-input" id="chId0" placeholder="e.g. 2845678">
+          </div>
+          <div>
+            <label class="text-[0.6rem] text-iot-mut block mb-1">Channel 1 ID</label>
+            <input type="text" class="iot-input" id="chId1" placeholder="e.g. 2845679">
+          </div>
+          <div>
+            <label class="text-[0.6rem] text-iot-mut block mb-1">Channel 2 ID</label>
+            <input type="text" class="iot-input" id="chId2" placeholder="e.g. 2845680">
+          </div>
+        </div>
+        <div class="grid sm:grid-cols-3 gap-2 mt-2">
+          <div>
+            <label class="text-[0.6rem] text-iot-mut block mb-1">Read API Key (optional)</label>
+            <input type="text" class="iot-input" id="readKey0" placeholder="For private channel">
+          </div>
+          <div>
+            <label class="text-[0.6rem] text-iot-mut block mb-1">Read API Key (optional)</label>
+            <input type="text" class="iot-input" id="readKey1" placeholder="For private channel">
+          </div>
+          <div>
+            <label class="text-[0.6rem] text-iot-mut block mb-1">Read API Key (optional)</label>
+            <input type="text" class="iot-input" id="readKey2" placeholder="For private channel">
+          </div>
+        </div>
+        <p class="text-[0.55rem] text-iot-mut mt-2">
+          <i class="fa-solid fa-shield-halved mr-1"></i>Public channels can be read with only the channel ID. Private channels need the Read API Key.
+        </p>
+      </div>
+
+      <div class="sum-grid grid grid-cols-4 gap-3 mb-4" style="grid-template-columns:repeat(4,1fr)">
+        <div class="bg-iot-card rounded-lg p-3 border border-iot-bdr flex items-center gap-3">
+          <div class="w-9 h-9 rounded-lg bg-iot-ok/10 flex items-center justify-center flex-shrink-0">
+            <i class="fa-solid fa-cubes text-iot-ok text-sm"></i>
+          </div>
+          <div>
+            <p class="text-[0.6rem] text-iot-mut uppercase tracking-wider font-medium">Total Items</p>
+            <p class="font-display font-bold text-lg text-iot-fg" id="sumI">0</p>
+          </div>
+        </div>
+
+        <div class="bg-iot-card rounded-lg p-3 border border-iot-bdr flex items-center gap-3">
+          <div class="w-9 h-9 rounded-lg bg-iot-warn/10 flex items-center justify-center flex-shrink-0">
+            <i class="fa-solid fa-peso-sign text-iot-warn text-sm"></i>
+          </div>
+          <div>
+            <p class="text-[0.6rem] text-iot-mut uppercase tracking-wider font-medium">Total Value</p>
+            <p class="font-display font-bold text-lg text-iot-fg" id="sumV">₱0.00</p>
+          </div>
+        </div>
+
+        <div class="bg-iot-card rounded-lg p-3 border border-iot-bdr flex items-center gap-3">
+          <div class="w-9 h-9 rounded-lg bg-iot-dng/10 flex items-center justify-center flex-shrink-0">
+            <i class="fa-solid fa-bell text-iot-dng text-sm"></i>
+          </div>
+          <div>
+            <p class="text-[0.6rem] text-iot-mut uppercase tracking-wider font-medium">Active Alerts</p>
+            <p class="font-display font-bold text-lg text-iot-fg" id="sumA">0 / 3</p>
+          </div>
+        </div>
+
+        <div class="bg-iot-card rounded-lg p-3 border border-iot-bdr flex items-center gap-3">
+          <div class="w-9 h-9 rounded-lg bg-iot-acc/10 flex items-center justify-center flex-shrink-0">
+            <i class="fa-solid fa-receipt text-iot-acc text-sm"></i>
+          </div>
+          <div>
+            <p class="text-[0.6rem] text-iot-mut uppercase tracking-wider font-medium">Total Checkout Price</p>
+            <p class="font-display font-bold text-lg text-iot-fg" id="sumC">₱0.00</p>
+          </div>
+        </div>
+      </div>
+
+      <div id="banZone" class="space-y-2 mb-4"></div>
+      <div id="shelfZone"></div>
+
+      <div class="bg-iot-card rounded-xl border border-iot-bdr p-4 mt-5">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="font-display font-semibold text-sm text-iot-fg flex items-center gap-2">
+            <i class="fa-solid fa-clock-rotate-left text-iot-dng text-xs"></i>Alert History
+          </h2>
+          <button class="text-[0.65rem] text-iot-mut hover:text-iot-fg2 transition-colors" onclick="clearHist()">Clear All</button>
+        </div>
+        <div id="histList" class="space-y-2 max-h-48 overflow-y-auto pr-1">
+          <div class="text-center py-6 text-iot-mut text-sm" id="noHist">
+            <i class="fa-solid fa-shield-check text-xl mb-1.5 block opacity-30"></i>No alerts triggered yet.
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <footer class="border-t border-iot-bdr bg-iot-bg/60 backdrop-blur-md py-3">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 flex flex-wrap items-center justify-between gap-2 text-[0.65rem] text-iot-mut">
+        <span>IoT Inventory System — 3-Shelf ESP32 + HX711 + LCD I2C + ThingSpeak</span>
+        <span id="modeFoot">Mode: Simulation</span>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    const SHELVES = [
+      {name:'Shelf A',label:'A',desc:'Canned Goods',accent:'#00d4aa',rgb:'0,212,170',initItems:50,wpu:100,defThresh:10,checkChance:.10,price:25},
+      {name:'Shelf B',label:'B',desc:'Bottled Drinks',accent:'#f59e0b',rgb:'245,158,11',initItems:35,wpu:150,defThresh:8,checkChance:.08,price:35},
+      {name:'Shelf C',label:'C',desc:'Snack Packs',accent:'#ec4899',rgb:'236,72,153',initItems:60,wpu:80,defThresh:12,checkChance:.12,price:15},
+    ];
+
+    const TS_READ_BASE = 'https://api.thingspeak.com/channels/';
+
+    const SS = SHELVES.map(s => ({
+      items:s.initItems,
+      baseW:s.initItems*s.wpu,
+      curW:s.initItems*s.wpu,
+      price:s.price,
+      thresh:s.defThresh,
+      wpu:s.wpu,
+      value:0,
+      low:false,
+      wHist:[],
+      iHist:[],
+      vHist:[],
+      tHist:[],
+      sHist:[],
+      reads:0,
+      chart:null,
+      removed:0,
+      checkout:0
+    }));
+
+    let allAlerts = [];
+    let running = true;
+    let speed = 1;
+    let timer = null;
+    let BASE_INT = 2000;
+    let MAX_PTS = 25;
+    let NOISE = 4;
+    let mode = 'sim';
+    let liveTimer = null;
+    let simCheckoutTotal = 0;
+    let liveCheckoutTotal = 0;
+
+    function buildBanner(i){
+      const c = SHELVES[i];
+      return `
+        <div class="alert-banner hidden" id="sb${i}">
+          <div class="w-6 h-6 rounded-full bg-iot-dng/20 flex items-center justify-center flex-shrink-0">
+            <i class="fa-solid fa-triangle-exclamation text-iot-dng" style="font-size:.6rem"></i>
+          </div>
+          <div class="flex-1">
+            <span class="font-display font-semibold text-xs text-iot-dng">${c.name} LOW STOCK</span>
+            <span class="text-[0.65rem] text-iot-fg2 ml-2" id="sbt${i}">—</span>
+          </div>
+        </div>`;
+    }
+
+    function buildShelf(i){
+      const c = SHELVES[i];
+      return `
+      <section class="mb-5 bg-iot-card rounded-xl border border-iot-bdr overflow-hidden" style="border-top:3px solid ${c.accent}">
+        <div class="flex items-center justify-between px-4 py-2.5 border-b border-iot-bdr">
+          <div class="flex items-center gap-2.5">
+            <div class="w-7 h-7 rounded-md flex items-center justify-center" style="background:rgba(${c.rgb},.15)">
+              <span class="font-display font-bold text-xs" style="color:${c.accent}">${c.label}</span>
+            </div>
+            <div>
+              <h2 class="font-display font-semibold text-sm text-iot-fg">${c.name}</h2>
+              <p class="text-[0.6rem] text-iot-mut">${c.desc}</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="pulse-dot" id="sd${i}"></span>
+            <span class="text-[0.6rem] font-display font-medium" style="color:${c.accent}" id="sl${i}">LIVE</span>
+          </div>
+        </div>
+
+        <div class="stat-grid grid gap-3 p-3 pb-0" style="grid-template-columns:repeat(5,1fr)">
+          <div class="stat-card bg-iot-bg2 rounded-lg p-2 border border-iot-bdr" style="--card-accent:${c.accent}">
+            <div class="flex items-center gap-1 mb-1">
+              <i class="fa-solid fa-weight-hanging" style="color:${c.accent};font-size:.55rem"></i>
+              <span class="text-[0.55rem] text-iot-mut uppercase tracking-wider font-medium">Weight</span>
+            </div>
+            <p class="font-display font-bold text-base text-iot-fg" id="sw${i}">0.0</p><p class="text-[0.5rem] text-iot-mut">grams</p>
+          </div>
+
+          <div class="stat-card bg-iot-bg2 rounded-lg p-2 border border-iot-bdr" style="--card-accent:#22c55e">
+            <div class="flex items-center gap-1 mb-1">
+              <i class="fa-solid fa-cubes text-iot-ok" style="font-size:.55rem"></i>
+              <span class="text-[0.55rem] text-iot-mut uppercase tracking-wider font-medium">Quantity</span>
+            </div>
+            <p class="font-display font-bold text-base text-iot-fg" id="si${i}">0</p><p class="text-[0.5rem] text-iot-mut">items</p>
+          </div>
+
+          <div class="stat-card bg-iot-bg2 rounded-lg p-2 border border-iot-bdr" style="--card-accent:#f59e0b">
+            <div class="flex items-center gap-1 mb-1">
+              <i class="fa-solid fa-peso-sign text-iot-warn" style="font-size:.55rem"></i>
+              <span class="text-[0.55rem] text-iot-mut uppercase tracking-wider font-medium">Value</span>
+            </div>
+            <p class="font-display font-bold text-base text-iot-fg" id="sv${i}">₱0.00</p><p class="text-[0.5rem] text-iot-mut">pesos</p>
+          </div>
+
+          <div class="stat-card bg-iot-bg2 rounded-lg p-2 border border-iot-bdr" style="--card-accent:#818cf8">
+            <div class="flex items-center gap-1 mb-1">
+              <i class="fa-solid fa-signal" style="color:#818cf8;font-size:.55rem"></i>
+              <span class="text-[0.55rem] text-iot-mut uppercase tracking-wider font-medium">Status</span>
+            </div>
+            <p class="font-display font-bold text-sm" id="sst${i}" style="color:#22c55e">NORMAL</p>
+            <div class="flex gap-1 mt-0.5">
+              <span class="field-badge" style="background:rgba(34,197,94,.1);color:#22c55e" id="fb4_${i}">F4: 1</span>
+            </div>
+          </div>
+
+          <div class="stat-card bg-iot-bg2 rounded-lg p-2 border border-iot-bdr" id="ssc${i}" style="--card-accent:#22c55e">
+            <div class="flex items-center gap-1 mb-1">
+              <i class="fa-solid fa-circle-check text-iot-ok" style="font-size:.55rem" id="ssi${i}"></i>
+              <span class="text-[0.55rem] text-iot-mut uppercase tracking-wider font-medium">Alert</span>
+            </div>
+            <p class="font-display font-bold text-sm" id="ssa${i}" style="color:#22c55e">CLEAR</p>
+            <p class="text-[0.5rem] text-iot-mut" id="ssh${i}">no alerts</p>
+          </div>
+        </div>
+
+        <div class="shelf-grid grid gap-3 p-3" style="grid-template-columns:2fr 1fr">
+          <div class="bg-iot-bg2 rounded-lg border border-iot-bdr p-3">
+            <div class="flex items-center justify-between mb-1.5">
+              <h3 class="font-display font-medium text-xs text-iot-fg">Real-Time Data</h3>
+              <div class="flex gap-1">
+                <span class="field-badge" style="background:rgba(${c.rgb},.1);color:${c.accent}">F1:Wt</span>
+                <span class="field-badge" style="background:rgba(34,197,94,.1);color:#22c55e">F2:Qty</span>
+                <span class="field-badge" style="background:rgba(245,158,11,.1);color:#f59e0b">F3:Val</span>
+                <span class="field-badge" style="background:rgba(129,140,248,.1);color:#818cf8">F4:St</span>
+              </div>
+            </div>
+            <span class="text-[0.6rem] text-iot-mut" id="scp${i}">0 readings</span>
+            <div style="height:190px;position:relative"><canvas id="sc${i}"></canvas></div>
+          </div>
+
+          <!-- This control column is shown only in simulation mode -->
+          <div class="flex flex-col gap-2 control-column" id="ctrl${i}">
+            <div class="bg-iot-bg2 rounded-lg border border-iot-bdr p-2.5">
+              <h4 class="font-display font-medium text-[0.65rem] text-iot-fg mb-1.5 flex items-center gap-1.5">
+                <i class="fa-solid fa-calculator text-iot-warn" style="font-size:.5rem"></i>Price Calculator
+              </h4>
+              <label class="text-[0.55rem] text-iot-mut block mb-1">Price/unit (₱)</label>
+              <input type="number" class="iot-input" placeholder="e.g. 25.00" min="0" step="0.01" id="sp${i}" value="${c.price}" oninput="hPrice(${i},this.value)">
+              <div class="bg-iot-card rounded p-2 mt-1.5">
+                <p class="font-display font-bold text-sm text-iot-warn" id="scv${i}">₱0.00</p>
+                <p class="text-[0.5rem] text-iot-mut" id="scb${i}">0 items × ₱0.00</p>
+              </div>
+            </div>
+
+            <div class="bg-iot-bg2 rounded-lg border border-iot-bdr p-2.5">
+              <h4 class="font-display font-medium text-[0.65rem] text-iot-fg mb-1.5 flex items-center gap-1.5">
+                <i class="fa-solid fa-bell text-iot-dng" style="font-size:.5rem"></i>Alert Threshold
+              </h4>
+              <input type="number" class="iot-input" placeholder="e.g. 10" min="0" step="1" value="${c.defThresh}" id="st${i}" oninput="hThresh(${i},this.value)">
+            </div>
+
+            <div class="bg-iot-bg2 rounded-lg border border-iot-bdr p-2.5">
+              <h4 class="font-display font-medium text-[0.65rem] text-iot-fg mb-1.5 flex items-center gap-1.5">
+                <i class="fa-solid fa-sliders" style="color:${c.accent};font-size:.5rem"></i>Manual
+              </h4>
+              <label class="text-[0.55rem] text-iot-mut block mb-1">Wt/unit (g)</label>
+              <input type="number" class="iot-input mb-1" placeholder="100" min="1" step="1" value="${c.wpu}" id="swu${i}" oninput="hWPU(${i},this.value)">
+              <div class="grid grid-cols-2 gap-1">
+                <button class="iot-btn iot-btn-ghost justify-center" onclick="hAdd(${i})">
+                  <i class="fa-solid fa-plus" style="font-size:.5rem"></i>Add
+                </button>
+                <button class="iot-btn iot-btn-danger justify-center" onclick="hRem(${i})">
+                  <i class="fa-solid fa-minus" style="font-size:.5rem"></i>Remove
+                </button>
+                <button class="iot-btn iot-btn-warn justify-center col-span-2" onclick="hRestock(${i})">
+                  <i class="fa-solid fa-truck-fast" style="font-size:.5rem"></i>Restock
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>`;
+    }
+
+    function initChart(i){
+      const ctx = document.getElementById('sc'+i).getContext('2d');
+      const rgb = SHELVES[i].rgb;
+      const g = ctx.createLinearGradient(0,0,0,190);
+      g.addColorStop(0,`rgba(${rgb},0.2)`);
+      g.addColorStop(.6,`rgba(${rgb},0.05)`);
+      g.addColorStop(1,'rgba(0,0,0,0)');
+
+      SS[i].chart = new Chart(ctx,{
+        type:'line',
+        data:{labels:[],datasets:[
+          {
+            label:'Weight (g)', data:[], borderColor:SHELVES[i].accent, backgroundColor:g,
+            fill:true, tension:.4, pointRadius:1.5, pointHoverRadius:4, pointBackgroundColor:SHELVES[i].accent,
+            pointBorderColor:'#080c14', pointBorderWidth:1, borderWidth:2, yAxisID:'y'
+          },
+          {
+            label:'Value (₱)', data:[], borderColor:'#f59e0b', backgroundColor:'transparent', fill:false,
+            tension:.3, pointRadius:1.5, pointHoverRadius:4, pointBackgroundColor:'#f59e0b',
+            pointBorderColor:'#080c14', pointBorderWidth:1, borderWidth:1.5, borderDash:[5,3], yAxisID:'y1'
+          }
+        ]},
+        options:{
+          responsive:true,
+          maintainAspectRatio:false,
+          animation:{duration:250,easing:'easeOutQuart'},
+          interaction:{mode:'index',intersect:false},
+          plugins:{
+            legend:{labels:{color:'#94a3b8',font:{family:'DM Sans',size:9},boxWidth:10,boxHeight:2,padding:10}},
+            tooltip:{backgroundColor:'#1a2332',titleColor:'#e2e8f0',bodyColor:'#cbd5e1',borderColor:'#334155',borderWidth:1,titleFont:{family:'Space Grotesk',weight:'600',size:10},bodyFont:{family:'DM Sans',size:10},padding:8,cornerRadius:6,displayColors:true,boxWidth:6,boxHeight:6}
+          },
+          scales:{
+            x:{ticks:{color:'#475569',font:{size:8,family:'DM Sans'},maxTicksLimit:7,maxRotation:0},grid:{color:'rgba(30,41,59,.4)',lineWidth:.5},border:{color:'#1e293b'}},
+            y:{position:'left',ticks:{color:SHELVES[i].accent,font:{size:8,family:'DM Sans'}},grid:{color:'rgba(30,41,59,.4)',lineWidth:.5},border:{color:'#1e293b'},title:{display:true,text:'Weight (g)',color:SHELVES[i].accent,font:{size:9,family:'Space Grotesk'}},beginAtZero:true},
+            y1:{position:'right',ticks:{color:'#f59e0b',font:{size:8,family:'DM Sans'}},grid:{drawOnChartArea:false},border:{color:'#1e293b'},title:{display:true,text:'Value (₱)',color:'#f59e0b',font:{size:9,family:'Space Grotesk'}},beginAtZero:true}
+          }
+        }
+      });
+    }
+
+    function getReadUrl(idx, channelId){
+      const readKey = (document.getElementById('readKey'+idx)?.value || '').trim();
+      let url = `${TS_READ_BASE}${channelId}/feeds.json?results=1`;
+      if (readKey) url += `&api_key=${encodeURIComponent(readKey)}`;
+      return url;
+    }
+
+    function parseFeedValue(v){
+      if (v === null || v === undefined || v === '') return null;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
+    }
+
+    async function fetchJSON(url, timeoutMs = 12000){
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), timeoutMs);
+      try {
+        const res = await fetch(url, {signal: ctrl.signal, cache: 'no-store'});
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
+      } finally {
+        clearTimeout(t);
+      }
+    }
+
+    async function liveTick(){
+      for(let i=0;i<3;i++){
+        const channelId = (document.getElementById('chId'+i).value || '').trim();
+        const statusEl = document.getElementById('sl'+i);
+        const dotEl = document.getElementById('sd'+i);
+
+        if(!channelId){
+          statusEl.textContent = 'NO CH ID';
+          dotEl.className = 'pulse-dot loading';
+          continue;
+        }
+
+        try {
+          const url = getReadUrl(i, channelId);
+          const data = await fetchJSON(url);
+
+          if (!data.feeds || !data.feeds.length) {
+            statusEl.textContent = 'NO DATA';
+            dotEl.className = 'pulse-dot loading';
+            continue;
+          }
+
+          const f = data.feeds[0];
+          const w   = parseFeedValue(f.field1) ?? 0;
+          const qty = parseFeedValue(f.field2) ?? 0;
+          const val = parseFeedValue(f.field3) ?? 0;
+          const stRaw = parseFeedValue(f.field4);
+          const st  = (stRaw === 0 ? 0 : 1);
+
+          if (i === 0) {
+            const chk = parseFeedValue(f.field5);
+            if (chk !== null) liveCheckoutTotal = chk;
+          }
+
+          SS[i].curW = w;
+          SS[i].items = qty;
+          SS[i].value = val;
+          SS[i].low = (st === 0);
+          SS[i].reads++;
+
+          const now = new Date();
+          const ts = now.toLocaleTimeString('en-US',{hour12:false});
+          SS[i].wHist.push(w);
+          SS[i].vHist.push(val);
+          SS[i].iHist.push(qty);
+          SS[i].sHist.push(st);
+          SS[i].tHist.push(ts);
+
+          if(SS[i].wHist.length > MAX_PTS){
+            SS[i].wHist.shift(); SS[i].vHist.shift(); SS[i].iHist.shift(); SS[i].sHist.shift(); SS[i].tHist.shift();
+          }
+
+          if(st === 0 && !SS[i].low){
+            SS[i].low = true;
+            pushAlert(i, qty);
+            showToast(SHELVES[i].name + ': LOW STOCK', 'danger');
+            document.getElementById('sb'+i).classList.remove('hidden');
+            document.getElementById('sbt'+i).textContent = `Live alert — ${qty} items`;
+            renderHist();
+          } else if(st === 1 && SS[i].low){
+            SS[i].low = false;
+            document.getElementById('sb'+i).classList.add('hidden');
+          }
+
+          updateUI(i, w, qty, val, st);
+          updChart(i);
+          statusEl.textContent = 'LIVE';
+          dotEl.className = 'pulse-dot';
+
+        } catch (err) {
+          console.error('Live fetch failed for channel', i, err);
+          statusEl.textContent = 'ERROR';
+          dotEl.className = 'pulse-dot danger';
+          showToast(`ThingSpeak read failed for ${SHELVES[i].name}`, 'warn');
+        }
+      }
+
+      updateSummary();
+    }
+
+    function aV(el, txt){
+      if(el.textContent !== txt){
+        el.textContent = txt;
+        el.classList.remove('num-flash');
+        void el.offsetWidth;
+        el.classList.add('num-flash');
+      }
+    }
+
+    function updateUI(i,w,items,val,status){
+      const sstEl = document.getElementById('sst'+i);
+      const fbEl = document.getElementById('fb4_'+i);
+      const ssaEl = document.getElementById('ssa'+i);
+      const sshEl = document.getElementById('ssh'+i);
+      const ssiEl = document.getElementById('ssi'+i);
+      const scEl = document.getElementById('ssc'+i);
+      const dot = document.getElementById('sd'+i);
+
+      aV(document.getElementById('sw'+i), w.toFixed(1));
+      aV(document.getElementById('si'+i), String(items));
+      aV(document.getElementById('sv'+i), '₱' + val.toFixed(2));
+
+      if(status === 0){
+        sstEl.textContent = 'LOW STOCK';
+        sstEl.style.color = '#ef4444';
+        fbEl.style.background = 'rgba(239,68,68,.1)';
+        fbEl.style.color = '#ef4444';
+        fbEl.textContent = 'F4: 0';
+      } else {
+        sstEl.textContent = 'NORMAL';
+        sstEl.style.color = '#22c55e';
+        fbEl.style.background = 'rgba(34,197,94,.1)';
+        fbEl.style.color = '#22c55e';
+        fbEl.textContent = 'F4: 1';
+      }
+
+      if(SS[i].low){
+        ssaEl.textContent = 'TRIGGERED';
+        ssaEl.style.color = '#ef4444';
+        sshEl.textContent = 'restock needed';
+        ssiEl.className = 'fa-solid fa-triangle-exclamation text-iot-dng';
+        ssiEl.style.fontSize = '.55rem';
+        scEl.style.setProperty('--card-accent', '#ef4444');
+        dot.className = 'pulse-dot danger';
+      } else {
+        ssaEl.textContent = 'CLEAR';
+        ssaEl.style.color = '#22c55e';
+        sshEl.textContent = 'no alerts';
+        ssiEl.className = 'fa-solid fa-circle-check text-iot-ok';
+        ssiEl.style.fontSize = '.55rem';
+        scEl.style.setProperty('--card-accent', '#22c55e');
+        dot.className = 'pulse-dot';
+      }
+    }
+
+    function updChart(i){
+      const s = SS[i];
+      s.chart.data.labels = s.tHist.slice();
+      s.chart.data.datasets[0].data = s.wHist.slice();
+      s.chart.data.datasets[1].data = s.vHist.slice();
+      s.chart.update('none');
+      document.getElementById('scp'+i).textContent = s.reads + ' readings';
+    }
+
+    function updCalc(i,items){
+      const s = SS[i];
+      const scv = document.getElementById('scv'+i);
+      const scb = document.getElementById('scb'+i);
+      if (scv) scv.textContent = '₱' + s.value.toFixed(2);
+      if (scb) scb.textContent = items + ' items × ₱' + s.price.toFixed(2);
+    }
+
+    function updateSummary(){
+      let tI = 0, tV = 0, aC = 0;
+      for(let i=0;i<3;i++){
+        tI += SS[i].items;
+        tV += SS[i].value;
+        if(SS[i].low) aC++;
+      }
+      aV(document.getElementById('sumI'), String(tI));
+      aV(document.getElementById('sumV'), '₱' + tV.toFixed(2));
+
+      const ae = document.getElementById('sumA');
+      const at = aC + ' / 3';
+      if(ae.textContent !== at){
+        ae.textContent = at;
+        ae.style.color = aC > 0 ? '#ef4444' : '#e2e8f0';
+      }
+
+      const checkout = (mode === 'live') ? liveCheckoutTotal : simCheckoutTotal;
+      aV(document.getElementById('sumC'), '₱' + checkout.toFixed(2));
+    }
+
+    function pushAlert(i,items){
+      const e = {
+        time: new Date().toLocaleString(),
+        name: SHELVES[i].name,
+        color: SHELVES[i].accent,
+        items: items,
+        thresh: SS[i].thresh,
+        weight: SS[i].curW.toFixed(1)
+      };
+      allAlerts.unshift(e);
+      if(allAlerts.length > 100) allAlerts.pop();
+    }
+
+    function renderHist(){
+      const list = document.getElementById('histList');
+      const noEl = document.getElementById('noHist');
+      if(!allAlerts.length){
+        if(noEl) noEl.style.display = '';
+        return;
+      }
+      if(noEl) noEl.style.display = 'none';
+      let h = '';
+      for(let k=0;k<allAlerts.length;k++){
+        const a = allAlerts[k];
+        h += `
+          <div class="alert-item" ${k>0 ? 'style="animation:none"' : ''}>
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full inline-block flex-shrink-0" style="background:${a.color}"></span>
+                <span class="font-display font-semibold text-[0.6rem]" style="color:${a.color}">${a.name}</span>
+              </div>
+              <span class="text-[0.55rem] text-iot-mut font-mono">${a.time}</span>
+            </div>
+            <div class="flex gap-3 mt-1 text-[0.55rem] text-iot-mut">
+              <span>Items: <span class="text-iot-fg2 font-medium">${a.items}</span></span>
+              <span>Threshold: <span class="text-iot-fg2 font-medium">${a.thresh}</span></span>
+              <span>Weight: <span class="text-iot-fg2 font-medium">${a.weight}g</span></span>
+            </div>
+          </div>`;
+      }
+      list.innerHTML = h;
+    }
+
+    function showToast(msg,type){
+      const c = document.getElementById('toastC');
+      const t = document.createElement('div');
+      t.className = 'toast toast-' + type;
+      const ic = {success:'fa-solid fa-circle-check', warn:'fa-solid fa-circle-exclamation', danger:'fa-solid fa-triangle-exclamation'};
+      t.innerHTML = `<i class="${ic[type] || ic.warn} flex-shrink-0" style="font-size:.75rem"></i><span class="flex-1">${msg}</span>`;
+      c.appendChild(t);
+      setTimeout(()=>{ t.classList.add('out'); setTimeout(()=>t.remove(),300); }, 3500);
+      const ts = c.querySelectorAll('.toast:not(.out)');
+      if(ts.length > 5){
+        ts[0].classList.add('out');
+        setTimeout(()=>ts[0].remove(),300);
+      }
+    }
+
+    function updateClock(){
+      document.getElementById('clock').textContent = new Date().toLocaleTimeString('en-US',{hour12:false});
+    }
+
+    function startSim(){ stopSim(); timer = setInterval(simTick, Math.max(200, BASE_INT / speed)); }
+    function stopSim(){ if(timer){ clearInterval(timer); timer = null; } }
+
+    function startLive(){
+      stopLive();
+      liveTimer = setInterval(liveTick, 15000);
+      liveTick();
+    }
+    function stopLive(){ if(liveTimer){ clearInterval(liveTimer); liveTimer = null; } }
+
+    function simTick(){
+      if(!running) return;
+      const now = new Date();
+      const ts = now.toLocaleTimeString('en-US',{hour12:false});
+
+      for(let i=0;i<3;i++){
+        const s = SS[i], cfg = SHELVES[i];
+        s.baseW = s.items * s.wpu;
+
+        const u1 = Math.max(.0001, Math.random());
+        const u2 = Math.random();
+        const gauss = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+        const noise = gauss * (NOISE * .6);
+
+        s.curW = Math.max(0, s.baseW + noise);
+
+        if(Math.random() < cfg.checkChance && s.items > 0){
+          s.items--;
+          s.baseW = s.items * s.wpu;
+          s.curW = Math.max(0, s.baseW + noise);
+
+          s.removed++;
+          s.checkout += s.price;
+          simCheckoutTotal += s.price;
+        }
+
+        const dI = Math.max(0, Math.round(s.curW / Math.max(1, s.wpu)));
+        s.value = dI * s.price;
+        s.reads++;
+        s.wHist.push(parseFloat(s.curW.toFixed(1)));
+        s.vHist.push(parseFloat(s.value.toFixed(2)));
+        s.iHist.push(dI);
+        s.sHist.push(s.low ? 0 : 1);
+        s.tHist.push(ts);
+
+        if(s.wHist.length > MAX_PTS){
+          s.wHist.shift(); s.vHist.shift(); s.iHist.shift(); s.sHist.shift(); s.tHist.shift();
+        }
+
+        checkAlertSim(i,dI);
+        updateUI(i,s.curW,dI,s.value,s.low ? 0 : 1);
+        updChart(i);
+        updCalc(i,dI);
+      }
+
+      updateSummary();
+    }
+
+    function checkAlertSim(i, items){
+      const s = SS[i];
+      const isLow = items <= s.thresh && s.thresh > 0;
+      if(isLow && !s.low){
+        s.low = true;
+        pushAlert(i, items);
+        showToast(SHELVES[i].name + ': ' + items + ' items left', 'danger');
+        document.getElementById('sb'+i).classList.remove('hidden');
+        document.getElementById('sbt'+i).textContent = 'Only ' + items + ' items — threshold is ' + s.thresh;
+        renderHist();
+      } else if(!isLow && s.low){
+        s.low = false;
+        document.getElementById('sb'+i).classList.add('hidden');
+        showToast(SHELVES[i].name + ': stock restored', 'success');
+      }
+    }
+
+    function applyModeUI(){
+      const bSim = document.getElementById('btnSim');
+      const bLive = document.getElementById('btnLive');
+      const lc = document.getElementById('liveConfig');
+      const mf = document.getElementById('modeFoot');
+
+      const controlColumns = document.querySelectorAll('.control-column');
+
+      if(mode === 'sim'){
+        bSim.className = 'mode-btn active-sim';
+        bLive.className = 'mode-btn';
+        lc.classList.add('hidden');
+        mf.textContent = 'Mode: Simulation';
+        document.getElementById('mainLabel').textContent = running ? 'SIMULATING' : 'PAUSED';
+        document.getElementById('mainDot').className = running ? 'pulse-dot' : 'pulse-dot danger';
+        document.getElementById('intLbl').textContent = 'Interval: 2s';
+
+        stopLive();
+        if(running) startSim();
+
+        document.getElementById('ppBtn').disabled = false;
+        document.getElementById('spdSlider').disabled = false;
+        document.getElementById('ppIcon').className = running ? 'fa-solid fa-pause' : 'fa-solid fa-play';
+        document.getElementById('ppText').textContent = running ? 'Pause' : 'Resume';
+
+        for(let i=0;i<3;i++){
+          document.getElementById('sl'+i).textContent = running ? 'LIVE' : 'PAUSED';
+          document.getElementById('sd'+i).className = running ? 'pulse-dot' : 'pulse-dot danger';
+        }
+
+        controlColumns.forEach(el => el.classList.remove('control-panel-hidden'));
+      } else {
+        bLive.className = 'mode-btn active-live';
+        bSim.className = 'mode-btn';
+        lc.classList.remove('hidden');
+        mf.textContent = 'Mode: Live (ThingSpeak)';
+        document.getElementById('mainLabel').textContent = 'LIVE DATA';
+        document.getElementById('mainDot').className = 'pulse-dot loading';
+        document.getElementById('intLbl').textContent = 'Interval: 15s (TS limit)';
+
+        stopSim();
+
+        document.getElementById('ppBtn').disabled = true;
+        document.getElementById('spdSlider').disabled = true;
+        document.getElementById('ppIcon').className = 'fa-solid fa-satellite-dish';
+        document.getElementById('ppText').textContent = 'Live';
+
+        for(let i=0;i<3;i++){
+          document.getElementById('sl'+i).textContent = 'CONNECTING...';
+          document.getElementById('sd'+i).className = 'pulse-dot loading';
+        }
+
+        controlColumns.forEach(el => el.classList.add('control-panel-hidden'));
+
+        startLive();
+      }
+
+      updateSummary();
+    }
+
+    function setMode(m){
+      mode = m;
+      applyModeUI();
+      showToast(mode === 'sim' ? 'Simulation mode' : 'Live mode — ThingSpeak', mode === 'sim' ? 'success' : 'warn');
+    }
+
+    function toggleRun(){
+      if(mode !== 'sim') return;
+      running = !running;
+      document.getElementById('ppIcon').className = running ? 'fa-solid fa-pause' : 'fa-solid fa-play';
+      document.getElementById('ppText').textContent = running ? 'Pause' : 'Resume';
+      document.getElementById('mainLabel').textContent = running ? 'SIMULATING' : 'PAUSED';
+      document.getElementById('mainDot').className = running ? 'pulse-dot' : 'pulse-dot danger';
+
+      for(let i=0;i<3;i++){
+        document.getElementById('sl'+i).textContent = running ? 'LIVE' : 'PAUSED';
+        document.getElementById('sd'+i).className = running ? 'pulse-dot' : 'pulse-dot danger';
+      }
+
+      if(running){
+        startSim();
+        showToast('Resumed', 'success');
+      } else {
+        stopSim();
+        showToast('Paused', 'warn');
+      }
+    }
+
+    function resetAll(){
+      for(let i=0;i<3;i++){
+        SS[i].items = SHELVES[i].initItems;
+        SS[i].baseW = SHELVES[i].initItems * SHELVES[i].wpu;
+        SS[i].curW = SS[i].baseW;
+        SS[i].wpu = SHELVES[i].wpu;
+        SS[i].price = SHELVES[i].price;
+        SS[i].thresh = SHELVES[i].defThresh;
+        SS[i].value = 0;
+        SS[i].low = false;
+        SS[i].reads = 0;
+        SS[i].removed = 0;
+        SS[i].checkout = 0;
+        SS[i].wHist = []; SS[i].vHist = []; SS[i].iHist = []; SS[i].sHist = []; SS[i].tHist = [];
+        document.getElementById('sb'+i).classList.add('hidden');
+        const sp = document.getElementById('sp'+i);
+        const st = document.getElementById('st'+i);
+        const swu = document.getElementById('swu'+i);
+        if(sp) sp.value = SHELVES[i].price;
+        if(st) st.value = SHELVES[i].defThresh;
+        if(swu) swu.value = SHELVES[i].wpu;
+        updateUI(i, SS[i].baseW, SHELVES[i].initItems, 0, 1);
+        updChart(i);
+        updCalc(i, SHELVES[i].initItems);
+      }
+
+      simCheckoutTotal = 0;
+      liveCheckoutTotal = 0;
+      allAlerts = [];
+      renderHist();
+      updateSummary();
+      showToast('All shelves reset', 'success');
+    }
+
+    function setSpd(v){
+      speed = parseFloat(v);
+      document.getElementById('spdLbl').textContent = v + 'x';
+      if(running && mode === 'sim'){
+        stopSim();
+        startSim();
+      }
+    }
+
+    function hPrice(i,v){
+      SS[i].price = Math.max(0, parseFloat(v) || 0);
+      const dI = Math.max(0, Math.round(SS[i].curW / Math.max(1, SS[i].wpu)));
+      SS[i].value = dI * SS[i].price;
+      aV(document.getElementById('sv'+i), '₱' + SS[i].value.toFixed(2));
+      updCalc(i, dI);
+      updateSummary();
+    }
+
+    function hThresh(i,v){
+      SS[i].thresh = Math.max(0, parseInt(v) || 0);
+      const dI = Math.max(0, Math.round(SS[i].curW / Math.max(1, SS[i].wpu)));
+      if(mode === 'sim'){
+        if(SS[i].low && dI > SS[i].thresh){
+          SS[i].low = false;
+          document.getElementById('sb'+i).classList.add('hidden');
+        } else if(!SS[i].low && dI <= SS[i].thresh && SS[i].thresh > 0){
+          SS[i].low = true;
+          pushAlert(i,dI);
+          renderHist();
+          document.getElementById('sb'+i).classList.remove('hidden');
+          document.getElementById('sbt'+i).textContent = 'Threshold changed to ' + SS[i].thresh;
+          showToast(SHELVES[i].name + ': alert triggered', 'danger');
+        }
+        updateUI(i, SS[i].curW, dI, SS[i].value, SS[i].low ? 0 : 1);
+      }
+      updateSummary();
+    }
+
+    function hWPU(i,v){
+      SS[i].wpu = Math.max(1, parseFloat(v) || 1);
+      SS[i].baseW = SS[i].items * SS[i].wpu;
+      SS[i].curW = SS[i].baseW;
+    }
+
+    function hAdd(i){
+      if(SS[i].items >= 200){ showToast(SHELVES[i].name + ': max 200', 'warn'); return; }
+      SS[i].items++;
+      SS[i].baseW = SS[i].items * SS[i].wpu;
+      SS[i].curW = SS[i].baseW;
+      const dI = SS[i].items;
+      SS[i].value = dI * SS[i].price;
+      if(mode === 'sim') checkAlertSim(i,dI);
+      updateUI(i,SS[i].curW,dI,SS[i].value,SS[i].low ? 0 : 1);
+      updCalc(i,dI);
+      updateSummary();
+      showToast(SHELVES[i].name + ': +1 (' + dI + ')', 'success');
+    }
+
+    function hRem(i){
+      if(SS[i].items <= 0){ showToast(SHELVES[i].name + ': empty', 'warn'); return; }
+      SS[i].items--;
+      SS[i].baseW = SS[i].items * SS[i].wpu;
+      SS[i].curW = SS[i].baseW;
+      const dI = SS[i].items;
+      SS[i].value = dI * SS[i].price;
+      SS[i].removed++;
+      SS[i].checkout += SS[i].price;
+      simCheckoutTotal += SS[i].price;
+      if(mode === 'sim') checkAlertSim(i,dI);
+      updateUI(i,SS[i].curW,dI,SS[i].value,SS[i].low ? 0 : 1);
+      updCalc(i,dI);
+      updateSummary();
+      showToast(SHELVES[i].name + ': -1 (' + dI + ')', 'warn');
+    }
+
+    function hRestock(i){
+      SS[i].items = SHELVES[i].initItems;
+      SS[i].baseW = SHELVES[i].initItems * SS[i].wpu;
+      SS[i].curW = SS[i].baseW;
+      const dI = SS[i].items;
+      SS[i].value = dI * SS[i].price;
+      if(mode === 'sim') checkAlertSim(i,dI);
+      updateUI(i,SS[i].curW,dI,SS[i].value,SS[i].low ? 0 : 1);
+      updCalc(i,dI);
+      updateSummary();
+      showToast(SHELVES[i].name + ': restocked', 'success');
+    }
+
+    function clearHist(){
+      allAlerts = [];
+      document.getElementById('histList').innerHTML = '<div class="text-center py-6 text-iot-mut text-sm" id="noHist"><i class="fa-solid fa-shield-check text-xl mb-1.5 block opacity-30"></i>No alerts triggered yet.</div>';
+      showToast('History cleared', 'success');
+    }
+
+    function init(){
+      document.getElementById('banZone').innerHTML = SHELVES.map((_,i)=>buildBanner(i)).join('');
+      document.getElementById('shelfZone').innerHTML = SHELVES.map((_,i)=>buildShelf(i)).join('');
+      for(let i=0;i<3;i++){
+        initChart(i);
+        updateUI(i, SS[i].baseW, SS[i].items, 0, 1);
+        updCalc(i, SS[i].items);
+      }
+      updateSummary();
+      updateClock();
+      setInterval(updateClock, 1000);
+      applyModeUI();
+      startSim();
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>
